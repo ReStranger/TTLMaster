@@ -9,14 +9,17 @@ import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Button;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import com.google.android.material.snackbar.Snackbar;
 
 import net.orange_box.storebox.StoreBox;
 
@@ -27,10 +30,6 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.Set;
 
-import butterknife.Bind;
-import butterknife.ButterKnife;
-import butterknife.OnClick;
-import ru.antiyotazapret.yotatetherttl.Android;
 import ru.antiyotazapret.yotatetherttl.Preferences;
 import ru.antiyotazapret.yotatetherttl.R;
 import ru.antiyotazapret.yotatetherttl.TtlApplication;
@@ -42,19 +41,10 @@ import ru.antiyotazapret.yotatetherttl.services.UpdateTtlTask;
 
 public class MainActivity extends AppCompatActivity {
 
-    @Bind(R.id.toolbar)
     Toolbar toolbar;
-
-    @Bind(R.id.current_ttl_view)
     TextView currentTtlView;
-
-    @Bind(R.id.swipe_refresh)
     SwipeRefreshLayout swipeRefreshLayout;
-
-    @Bind(R.id.current_ttl_scope)
     TextView ttlScopeTextView;
-
-    @Bind(R.id.refreshed_at)
     TextView refreshedAtTextView;
 
     private Preferences preferences;
@@ -66,7 +56,19 @@ public class MainActivity extends AppCompatActivity {
         preferences = StoreBox.create(this, Preferences.class);
 
         setContentView(R.layout.main);
-        ButterKnife.bind(this);
+        toolbar = findViewById(R.id.toolbar);
+        currentTtlView = findViewById(R.id.current_ttl_view);
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh);
+        ttlScopeTextView = findViewById(R.id.current_ttl_scope);
+        refreshedAtTextView = findViewById(R.id.refreshed_at);
+
+        Button applyTtlButton = findViewById(R.id.apply_ttl_method_button);
+        Button refreshListButton = findViewById(R.id.refresh_list_button);
+        Button tetheringSettingsButton = findViewById(R.id.open_tethering_settings_button);
+
+        applyTtlButton.setOnClickListener(v -> ttlClicked());
+        refreshListButton.setOnClickListener(v -> refreshClicked());
+        tetheringSettingsButton.setOnClickListener(v -> openTetheringSettingsButton());
 
         String version = getAppVersion();
 
@@ -140,26 +142,26 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_4pda:
-                Uri uri = Uri.parse(getString(R.string.app_web_address)); //Ссылка на тему 4PDA
-                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-                startActivity(intent);
-                return true;
-
-            case R.id.action_settings: //Кнопка настроек
-                Intent settings = new Intent(MainActivity.this, SettingsActivity.class);
-                startActivity(settings);
-                return true;
-
+        int itemId = item.getItemId();
+        if (itemId == R.id.action_4pda) {
+            Uri uri = Uri.parse(getString(R.string.app_web_address));
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            startActivity(intent);
+            return true;
         }
+
+        if (itemId == R.id.action_settings) {
+            Intent settings = new Intent(MainActivity.this, SettingsActivity.class);
+            startActivity(settings);
+            return true;
+        }
+
         return false;
     }
 
     /**
      * Событие нажатия кнопки задания TTL
      */
-    @OnClick(R.id.apply_ttl_method_button)
     void ttlClicked() {
 
         new ChangeTask().attach(new Task.OnResult<Void>() {
@@ -180,7 +182,6 @@ public class MainActivity extends AppCompatActivity {
         Snackbar.make(swipeRefreshLayout, getResources().getText(resid), Snackbar.LENGTH_LONG).show();
     }
 
-    @OnClick(R.id.refresh_list_button)
     void refreshClicked() {
 
         swipeRefreshLayout.setRefreshing(true);
@@ -205,7 +206,6 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Открытие настроек тетеринга
      */
-    @OnClick(R.id.open_tethering_settings_button)
     void openTetheringSettingsButton() {
         Intent tetherSettings = new Intent();
         tetherSettings.setClassName("com.android.settings", "com.android.settings.TetherSettings");
@@ -262,4 +262,3 @@ public class MainActivity extends AppCompatActivity {
     }
 
 }
-

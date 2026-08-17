@@ -1,21 +1,19 @@
 package ru.antiyotazapret.yotatetherttl.ui;
 
 import android.app.Activity;
-import android.app.PendingIntent;
-import android.content.Intent;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceActivity;
-import android.support.v7.widget.Toolbar;
 import android.util.TypedValue;
-import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.FragmentManager;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
 
 import ru.antiyotazapret.yotatetherttl.R;
 
 @SuppressWarnings("ALL")
-public class SettingsActivity extends PreferenceActivity {
-
-    private PendingIntent intent;
+public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,35 +25,42 @@ public class SettingsActivity extends PreferenceActivity {
         toolbar.setTitle(R.string.action_settings);
         toolbar.setClickable(true);
         toolbar.setNavigationIcon(getResIdFromAttribute(this));
-        toolbar.setNavigationOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
+        toolbar.setNavigationOnClickListener(v -> finish());
 
-        intent = PendingIntent.getActivity(getApplicationContext(), 0,
-                new Intent(getIntent()), 0);
-
-        addPreferencesFromResource(R.xml.preferences);
-
-        findPreference(getString(R.string.prefs_misc_restart_key)).setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-            @Override
-            public boolean onPreferenceClick(Preference preference) {
-                System.exit(1);
-                return true;
-            }
-        });
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        if (fragmentManager.findFragmentById(R.id.settings_container) == null) {
+            fragmentManager.beginTransaction()
+                    .replace(R.id.settings_container, new SettingsFragment())
+                    .commit();
+        }
 
     }
 
     private static int getResIdFromAttribute(final Activity activity) {
-        if (R.attr.homeAsUpIndicator == 0) {
+        int[] attrs = new int[] { androidx.appcompat.R.attr.homeAsUpIndicator };
+        if (attrs[0] == 0) {
             return 0;
         }
         final TypedValue typedvalueattr = new TypedValue();
-        activity.getTheme().resolveAttribute(R.attr.homeAsUpIndicator, typedvalueattr, true);
+        activity.getTheme().resolveAttribute(androidx.appcompat.R.attr.homeAsUpIndicator, typedvalueattr, true);
         return typedvalueattr.resourceId;
+    }
+
+    public static class SettingsFragment extends PreferenceFragmentCompat {
+
+        @Override
+        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+            setPreferencesFromResource(R.xml.preferences, rootKey);
+
+            Preference restartPreference = findPreference(getString(R.string.prefs_misc_restart_key));
+            if (restartPreference != null) {
+                restartPreference.setOnPreferenceClickListener(preference -> {
+                    requireActivity().finishAffinity();
+                    System.exit(1);
+                    return true;
+                });
+            }
+        }
     }
 
 }

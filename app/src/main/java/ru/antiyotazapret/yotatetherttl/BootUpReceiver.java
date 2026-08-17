@@ -3,6 +3,7 @@ package ru.antiyotazapret.yotatetherttl;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 
 import net.orange_box.storebox.StoreBox;
 
@@ -26,7 +27,11 @@ public class BootUpReceiver extends BroadcastReceiver {
             case Intent.ACTION_BOOT_COMPLETED:
             case "android.intent.action.QUICKBOOT_POWERON":
                 Intent boot = new Intent(context, ChangeDeviceTtlService.class);
-                context.startService(boot);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(boot);
+                } else {
+                    context.startService(boot);
+                }
                 break;
 
             default:

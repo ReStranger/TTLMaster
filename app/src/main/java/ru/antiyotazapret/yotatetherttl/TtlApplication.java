@@ -4,22 +4,17 @@ import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
 import net.orange_box.storebox.StoreBox;
-
-import org.acra.ACRA;
-import org.acra.annotation.ReportsCrashes;
 
 import java.util.Locale;
 
 /**
  * @author Pavel Savinov (swapii@gmail.com)
  */
-@ReportsCrashes(
-        mailTo = "ttlbugs@2-47.ru"
-)
 public class TtlApplication extends Application {
 
     private Preferences preferences;
@@ -46,15 +41,22 @@ public class TtlApplication extends Application {
         String lang = preferences.getSelectedLanguage();
         if (lang.equals("default")) {
             //Автоматическое назначение языка
-            lang = getResources().getConfiguration().locale.getCountry();
+            Locale systemLocale;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                systemLocale = getResources().getConfiguration().getLocales().get(0);
+            } else {
+                systemLocale = getResources().getConfiguration().locale;
+            }
+            lang = systemLocale.getLanguage();
         }
 
         Locale locale = new Locale(lang);
         Locale.setDefault(locale);
 
-        Configuration config = new Configuration();
-        config.locale = locale;
-        getBaseContext().getResources().updateConfiguration(config, null);
+        Configuration config = new Configuration(getResources().getConfiguration());
+        config.setLocale(locale);
+        Context context = createConfigurationContext(config);
+        getResources().updateConfiguration(context.getResources().getConfiguration(), getResources().getDisplayMetrics());
     }
 
     private void upgradePreferences() {
@@ -117,7 +119,5 @@ public class TtlApplication extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-
-        ACRA.init(this);
     }
 }

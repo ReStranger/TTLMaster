@@ -26,6 +26,9 @@
     <string name="prefs_general_fixInputTtl_title">Fix input ttl</string>
     <string name="prefs_general_fixInputTtl_summary">If operator send TTL=1 then the option will fix it</string>
 
+    <string name="prefs_general_routeVpnTraffic_title">Route tethering traffic to VPN</string>
+    <string name="prefs_general_routeVpnTraffic_summary">Mark tethering traffic and route it through tun0 when a VPN is active</string>
+
     <string name="prefs_boot_title">Autostart</string>
 
     <string name="prefs_boot_autoStart_title">Autostart</string>

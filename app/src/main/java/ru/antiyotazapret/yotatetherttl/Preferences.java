@@ -99,6 +99,15 @@ public interface Preferences {
     boolean fixInputTtl();
 
     /**
+     * Нужно ли заворачивать трафик в VPN-интерфейс.
+     *
+     * @return {@code true} если заворот включен
+     */
+    @KeyByResource(R.string.prefs_general_routeVpnTraffic_key)
+    @DefaultValue(R.bool.prefs_general_routeVpnTraffic_default)
+    boolean routeVpnTraffic();
+
+    /**
      * URL списка блокировки
      *
      * @return URL

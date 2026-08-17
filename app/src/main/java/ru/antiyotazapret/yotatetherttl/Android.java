@@ -19,6 +19,7 @@ public class Android {
 
     private static ShellExecutor executor = new ShellExecutor();
     private static String[] INTERFACE_MASKS = new String[] {"rmnet+", "rev_rmnet+"};
+    private static String[] VPN_INTERFACE_MASKS = new String[] {"tun+", "ppp+", "wg+", "tap+"};
 
     public static void enabledAirplaneMode() throws IOException, InterruptedException {
         executor.executeAsRoot("settings put global airplane_mode_on 1");
@@ -56,7 +57,18 @@ public class Android {
 
     public static int getDeviceTtl() throws IOException, InterruptedException {
         ShellExecutor.Result result = executor.execute("cat /proc/sys/net/ipv4/ip_default_ttl");
-        final int default_ttl = Integer.parseInt(result.getOutput().trim());
+        String output = result.getOutput().trim();
+        if (output.isEmpty()) {
+            throw new IOException("Unable to read device TTL");
+        }
+
+        final int default_ttl;
+        try {
+            default_ttl = Integer.parseInt(output);
+        } catch (NumberFormatException e) {
+            throw new IOException("Unexpected TTL value: " + output, e);
+        }
+
         final boolean forced = isTtlForced();
         final boolean workaround = isWorkaroundApplied();
 
@@ -77,6 +89,42 @@ public class Android {
 
     public static void forceSetInputTtl() throws  IOException, InterruptedException {
         executor.executeAsRoot("iptables -t mangle -I PREROUTING -j TTL --ttl-inc 1");
+    }
+
+    public static void disableVpnTrafficRouting() throws IOException, InterruptedException {
+        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i wlan+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i ap+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i rndis+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("ip rule del fwmark 65 table 165");
+        for (String ifaceMask : VPN_INTERFACE_MASKS) {
+            executor.executeAsRoot(String.format("ip route del default dev %s table 165", ifaceMask));
+        }
+        executor.executeAsRoot("ip route flush cache");
+    }
+
+    public static void routeVpnTraffic() throws IOException, InterruptedException {
+        String vpnInterface = getVpnInterface();
+        if (vpnInterface == null) {
+            throw new IOException("VPN interface was not detected");
+        }
+
+        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i wlan+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i ap+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i rndis+ -j CONNMARK --set-mark 65");
+        executor.executeAsRoot("ip rule add fwmark 65 table 165");
+        executor.executeAsRoot(String.format("ip route add default dev %s table 165", vpnInterface));
+        executor.executeAsRoot("ip route flush cache");
+    }
+
+    private static String getVpnInterface() throws IOException, InterruptedException {
+        ShellExecutor.Result result = executor.executeAsRoot(
+                "for p in /sys/class/net/tun* /sys/class/net/ppp* /sys/class/net/wg* /sys/class/net/tap*; do " +
+                        "if [ -d \"$p\" ] && [ \"$(cat \"$p/operstate\" 2>/dev/null)\" != \"down\" ]; then basename \"$p\"; exit 0; fi; " +
+                        "done; " +
+                        "ip route 2>/dev/null | grep -E \" dev (tun|ppp|wg|tap)[0-9]*\" | head -n1 | sed -E 's/.* dev ((tun|ppp|wg|tap)[^ ]*).*/\\1/'"
+        );
+        String iface = result.getOutput().trim();
+        return iface.isEmpty() ? null : iface;
     }
 
     public static boolean isTtlForced() throws IOException, InterruptedException {

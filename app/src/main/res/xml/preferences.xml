@@ -55,6 +55,12 @@
             android:key="@string/prefs_general_fixInputTtl_key"
             android:summary="@string/prefs_general_fixInputTtl_summary"
             android:title="@string/prefs_general_fixInputTtl_title" />
+
+        <CheckBoxPreference
+            android:defaultValue="@bool/prefs_general_routeVpnTraffic_default"
+            android:key="@string/prefs_general_routeVpnTraffic_key"
+            android:summary="@string/prefs_general_routeVpnTraffic_summary"
+            android:title="@string/prefs_general_routeVpnTraffic_title" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/prefs_restrictions_title">

@@ -1,7 +1,6 @@
 package ru.antiyotazapret.yotatetherttl.services;
 
 import android.content.Context;
-import android.support.v4.app.NotificationCompat;
 
 import java.io.IOException;
 
@@ -44,6 +43,11 @@ public class ChangeTask extends Task<ChangeTask.ChangeTaskParameters,Void> {
             }
             if(preferences.fixInputTtl()) {
                 Android.forceSetInputTtl();
+            }
+
+            Android.disableVpnTrafficRouting();
+            if (preferences.routeVpnTraffic()) {
+                Android.routeVpnTraffic();
             }
 
             Android.disableTetheringNotification();
@@ -103,4 +107,3 @@ public class ChangeTask extends Task<ChangeTask.ChangeTaskParameters,Void> {
     }
 
 }
-

@@ -10,6 +10,9 @@
     <string name="prefs_general_fixInputTtl_key" translatable="false">fixInputTtl</string>
     <bool name="prefs_general_fixInputTtl_default" translatable="false">false</bool>
 
+    <string name="prefs_general_routeVpnTraffic_key" translatable="false">routeVpnTraffic</string>
+    <bool name="prefs_general_routeVpnTraffic_default" translatable="false">false</bool>
+
     <string name="prefs_general_reconnectType_key" translatable="false">reconnect_type</string>
     <string name="prefs_general_reconnectType_airplane" translatable="false">airplane</string>
     <string name="prefs_general_reconnectType_mobile" translatable="false">mobile</string>

@@ -20,6 +20,7 @@ public class Android {
     private static ShellExecutor executor = new ShellExecutor();
     private static String[] INTERFACE_MASKS = new String[] {"rmnet+", "rev_rmnet+"};
     private static String[] VPN_INTERFACE_MASKS = new String[] {"tun+", "ppp+", "wg+", "tap+"};
+    private static String[] IPTABLES_CANDIDATES = new String[] {"iptables", "iptables-legacy", "iptables-nft"};
 
     public static void enabledAirplaneMode() throws IOException, InterruptedException {
         executor.executeAsRoot("settings put global airplane_mode_on 1");
@@ -56,8 +57,7 @@ public class Android {
     }
 
     public static int getDeviceTtl() throws IOException, InterruptedException {
-        ShellExecutor.Result result = executor.execute("cat /proc/sys/net/ipv4/ip_default_ttl");
-        String output = result.getOutput().trim();
+        String output = readDeviceTtlValue();
         if (output.isEmpty()) {
             throw new IOException("Unable to read device TTL");
         }
@@ -79,8 +79,19 @@ public class Android {
      * Проверка возможности использования ttl-set
      */
     public static boolean canForceTtl() throws IOException, InterruptedException {
-        return executor.executeAsRoot("cat /proc/net/ip_tables_matches | grep -q ttl && echo ok")
-                .getOutput().startsWith("ok");
+        String iptablesCommand = getIptablesCommand();
+        if (iptablesCommand == null) {
+            return false;
+        }
+
+        String addRule = String.format("%s -t mangle -A POSTROUTING -j TTL --ttl-set 64 >/dev/null 2>&1", iptablesCommand);
+        ShellExecutor.Result addResult = executor.executeAsRoot(addRule);
+        if (addResult.getExitCode() != 0) {
+            return false;
+        }
+
+        executor.executeAsRoot(String.format("%s -t mangle -D POSTROUTING -j TTL --ttl-set 64 >/dev/null 2>&1", iptablesCommand));
+        return true;
     }
 
     public static void forceSetTtl() throws  IOException, InterruptedException {
@@ -128,12 +139,22 @@ public class Android {
     }
 
     public static boolean isTtlForced() throws IOException, InterruptedException {
-        return executor.executeAsRoot("(iptables -t mangle -L | grep -q 'TTL set to 64' && echo ok)")
+        String iptablesCommand = getIptablesCommand();
+        if (iptablesCommand == null) {
+            return false;
+        }
+
+        return executor.executeAsRoot(String.format("(%s -t mangle -L 2>/dev/null | grep -q 'TTL set to 64' && echo ok)", iptablesCommand))
                 .getOutput().startsWith("ok");
     }
 
     public static boolean isWorkaroundApplied() throws IOException, InterruptedException {
-        return executor.executeAsRoot("(iptables -t filter -S sort_out_interface >/dev/null && echo ok)")
+        String iptablesCommand = getIptablesCommand();
+        if (iptablesCommand == null) {
+            return false;
+        }
+
+        return executor.executeAsRoot(String.format("(%s -t filter -S sort_out_interface >/dev/null 2>&1 && echo ok)", iptablesCommand))
                 .getOutput().startsWith("ok");
     }
 
@@ -143,8 +164,42 @@ public class Android {
     }
 
     public static boolean hasIptables() throws IOException, InterruptedException {
-        return executor.executeAsRoot("iptables -S &>/dev/null && echo ok")
-                .getOutput().startsWith("ok");
+        return getIptablesCommand() != null;
+    }
+
+    private static String readDeviceTtlValue() throws IOException, InterruptedException {
+        for (String command : new String[] {
+                "sysctl -n net.ipv4.ip_default_ttl 2>/dev/null",
+                "cat /proc/sys/net/ipv4/ip_default_ttl 2>/dev/null"
+        }) {
+            String output = executor.execute(command).getOutput().trim();
+            if (!output.isEmpty()) {
+                return output;
+            }
+        }
+
+        for (String command : new String[] {
+                "sysctl -n net.ipv4.ip_default_ttl 2>/dev/null",
+                "cat /proc/sys/net/ipv4/ip_default_ttl 2>/dev/null"
+        }) {
+            String output = executor.executeAsRoot(command).getOutput().trim();
+            if (!output.isEmpty()) {
+                return output;
+            }
+        }
+
+        return "";
+    }
+
+    private static String getIptablesCommand() throws IOException, InterruptedException {
+        for (String candidate : IPTABLES_CANDIDATES) {
+            ShellExecutor.Result result = executor.executeAsRoot(String.format("command -v %s >/dev/null 2>&1 && echo ok", candidate));
+            if (result.getOutput().startsWith("ok")) {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     public static void disableBlockList() throws IOException, InterruptedException {

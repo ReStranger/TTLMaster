@@ -42,6 +42,4 @@
     <string name="main_ttl_iptables_workaround">For all packets (iptables-workaround)</string>
     <string name="notification_boot_message">Successfully applied</string>
     <string name="notification_boot_error_message">Error occured :(</string>
-
-
 </resources>

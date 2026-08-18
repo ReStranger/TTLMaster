@@ -163,6 +163,10 @@ public class MainActivity extends AppCompatActivity {
      * Событие нажатия кнопки задания TTL
      */
     void ttlClicked() {
+        applyTtl();
+    }
+
+    private void applyTtl() {
 
         new ChangeTask().attach(new Task.OnResult<Void>() {
             @Override

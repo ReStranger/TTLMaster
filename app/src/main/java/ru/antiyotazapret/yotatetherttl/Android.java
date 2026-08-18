@@ -20,7 +20,9 @@ public class Android {
     private static ShellExecutor executor = new ShellExecutor();
     private static String[] INTERFACE_MASKS = new String[] {"rmnet+", "rev_rmnet+"};
     private static String[] VPN_INTERFACE_MASKS = new String[] {"tun+", "ppp+", "wg+", "tap+"};
+    private static String[] TETHER_INTERFACE_MASKS = new String[] {"wlan+", "ap+", "rndis+", "usb+", "bt-pan"};
     private static String[] IPTABLES_CANDIDATES = new String[] {"iptables", "iptables-legacy", "iptables-nft"};
+    private static final int VPN_TETHER_TABLE = 61;
 
     public static void enabledAirplaneMode() throws IOException, InterruptedException {
         executor.executeAsRoot("settings put global airplane_mode_on 1");
@@ -95,36 +97,68 @@ public class Android {
     }
 
     public static void forceSetTtl() throws  IOException, InterruptedException {
-        executor.executeAsRoot("iptables -t mangle -A POSTROUTING -j TTL --ttl-set 64");
+        executor.executeAsRoot(String.format("%s -t mangle -A POSTROUTING -j TTL --ttl-set 64", getRequiredIptablesCommand()));
     }
 
     public static void forceSetInputTtl() throws  IOException, InterruptedException {
-        executor.executeAsRoot("iptables -t mangle -I PREROUTING -j TTL --ttl-inc 1");
+        executor.executeAsRoot(String.format("%s -t mangle -I PREROUTING -j TTL --ttl-inc 1", getRequiredIptablesCommand()));
     }
 
     public static void disableVpnTrafficRouting() throws IOException, InterruptedException {
-        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i wlan+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i ap+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("iptables -t mangle -D PREROUTING -i rndis+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("ip rule del fwmark 65 table 165");
-        for (String ifaceMask : VPN_INTERFACE_MASKS) {
-            executor.executeAsRoot(String.format("ip route del default dev %s table 165", ifaceMask));
+        String iptablesCommand = getRequiredIptablesCommand();
+        String vpnInterface = getVpnInterface();
+        TetherInterface tetherInterface = getTetherInterface();
+
+        if (vpnInterface != null) {
+            executor.executeAsRoot(String.format("%s -t nat -D POSTROUTING -o %s -j MASQUERADE >/dev/null 2>&1", iptablesCommand, vpnInterface));
         }
+
+        executor.executeAsRoot(String.format("%s -t filter -D FORWARD -j ACCEPT >/dev/null 2>&1", iptablesCommand));
+
+        if (tetherInterface != null) {
+            executor.executeAsRoot(String.format("ip rule del from %s lookup %d >/dev/null 2>&1", tetherInterface.subnet, VPN_TETHER_TABLE));
+            executor.executeAsRoot(String.format("ip route del %s dev %s scope link table %d >/dev/null 2>&1", tetherInterface.subnet, tetherInterface.name, VPN_TETHER_TABLE));
+            executor.executeAsRoot(String.format("ip route del broadcast 255.255.255.255 dev %s scope link table %d >/dev/null 2>&1", tetherInterface.name, VPN_TETHER_TABLE));
+        }
+
+        if (vpnInterface != null) {
+            executor.executeAsRoot(String.format("ip route del default dev %s scope link table %d >/dev/null 2>&1", vpnInterface, VPN_TETHER_TABLE));
+            executor.executeAsRoot(String.format("ip route del default dev %s table %d >/dev/null 2>&1", vpnInterface, VPN_TETHER_TABLE));
+        }
+
+        executor.executeAsRoot(String.format("ip route flush table %d >/dev/null 2>&1", VPN_TETHER_TABLE));
         executor.executeAsRoot("ip route flush cache");
     }
 
     public static void routeVpnTraffic() throws IOException, InterruptedException {
+        String iptablesCommand = getRequiredIptablesCommand();
         String vpnInterface = getVpnInterface();
+        TetherInterface tetherInterface = getTetherInterface();
         if (vpnInterface == null) {
             throw new IOException("VPN interface was not detected");
         }
+        if (tetherInterface == null) {
+            throw new IOException("Tethering interface was not detected");
+        }
 
-        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i wlan+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i ap+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("iptables -t mangle -I PREROUTING -i rndis+ -j CONNMARK --set-mark 65");
-        executor.executeAsRoot("ip rule add fwmark 65 table 165");
-        executor.executeAsRoot(String.format("ip route add default dev %s table 165", vpnInterface));
+        executor.executeAsRoot(String.format("%s -t filter -I FORWARD -j ACCEPT", iptablesCommand));
+        executor.executeAsRoot(String.format("%s -t nat -I POSTROUTING -o %s -j MASQUERADE", iptablesCommand, vpnInterface));
+        executor.executeAsRoot(String.format("ip rule add from %s lookup %d", tetherInterface.subnet, VPN_TETHER_TABLE));
+        executor.executeAsRoot(String.format("ip route add default dev %s scope link table %d", vpnInterface, VPN_TETHER_TABLE));
+        executor.executeAsRoot(String.format("ip route add %s dev %s scope link table %d", tetherInterface.subnet, tetherInterface.name, VPN_TETHER_TABLE));
+        executor.executeAsRoot(String.format("ip route add broadcast 255.255.255.255 dev %s scope link table %d", tetherInterface.name, VPN_TETHER_TABLE));
         executor.executeAsRoot("ip route flush cache");
+    }
+
+    public static String getVpnRoutingStatus() throws IOException, InterruptedException {
+        String vpnInterface = getVpnInterface();
+        TetherInterface tetherInterface = getTetherInterface();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("vpn=").append(vpnInterface == null ? "-" : vpnInterface);
+        sb.append(", tether=").append(tetherInterface == null ? "-" : tetherInterface.name);
+        sb.append(", subnet=").append(tetherInterface == null ? "-" : tetherInterface.subnet);
+        return sb.toString();
     }
 
     private static String getVpnInterface() throws IOException, InterruptedException {
@@ -136,6 +170,56 @@ public class Android {
         );
         String iface = result.getOutput().trim();
         return iface.isEmpty() ? null : iface;
+    }
+
+    private static TetherInterface getTetherInterface() throws IOException, InterruptedException {
+        for (String ifaceMask : TETHER_INTERFACE_MASKS) {
+            ShellExecutor.Result ifaceResult = executor.executeAsRoot(String.format(
+                    "for p in /sys/class/net/%s; do " +
+                            "if [ -d \"$p\" ] && [ \"$(cat \"$p/operstate\" 2>/dev/null)\" != \"down\" ]; then basename \"$p\"; exit 0; fi; " +
+                            "done",
+                    ifaceMask
+            ));
+            String iface = ifaceResult.getOutput().trim();
+            if (iface.isEmpty()) {
+                continue;
+            }
+
+            String subnet = getIpv4Subnet(iface);
+            if (!subnet.isEmpty()) {
+                return new TetherInterface(iface, subnet);
+            }
+        }
+
+        ShellExecutor.Result fallback = executor.executeAsRoot(
+                "ip -4 addr show 2>/dev/null | awk '" +
+                        "/^[0-9]+: / { iface=$2; sub(\":\", \"\", iface) } " +
+                        "/ inet 192\\.168\\./ { print iface \" \" $2; exit }'"
+        );
+        String[] parts = fallback.getOutput().trim().split("\\s+");
+        if (parts.length == 2) {
+            return new TetherInterface(parts[0], parts[1]);
+        }
+
+        return null;
+    }
+
+    private static String getIpv4Subnet(String iface) throws IOException, InterruptedException {
+        ShellExecutor.Result result = executor.executeAsRoot(String.format(
+                "ip -4 addr show dev %s 2>/dev/null | awk '/ inet / { print $2; exit }'",
+                iface
+        ));
+        return result.getOutput().trim();
+    }
+
+    private static class TetherInterface {
+        final String name;
+        final String subnet;
+
+        TetherInterface(String name, String subnet) {
+            this.name = name;
+            this.subnet = subnet;
+        }
     }
 
     public static boolean isTtlForced() throws IOException, InterruptedException {
@@ -200,6 +284,15 @@ public class Android {
         }
 
         return null;
+    }
+
+    private static String getRequiredIptablesCommand() throws IOException, InterruptedException {
+        String iptablesCommand = getIptablesCommand();
+        if (iptablesCommand == null) {
+            throw new IOException("iptables command was not detected");
+        }
+
+        return iptablesCommand;
     }
 
     public static void disableBlockList() throws IOException, InterruptedException {

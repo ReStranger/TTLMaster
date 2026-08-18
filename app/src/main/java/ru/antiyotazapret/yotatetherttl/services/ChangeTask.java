@@ -1,7 +1,6 @@
 package ru.antiyotazapret.yotatetherttl.services;
 
 import android.content.Context;
-
 import java.io.IOException;
 
 import ru.antiyotazapret.yotatetherttl.Android;
@@ -48,6 +47,7 @@ public class ChangeTask extends Task<ChangeTask.ChangeTaskParameters,Void> {
             Android.disableVpnTrafficRouting();
             if (preferences.routeVpnTraffic()) {
                 Android.routeVpnTraffic();
+                TtlApplication.Logi("VPN routing: " + Android.getVpnRoutingStatus());
             }
 
             Android.disableTetheringNotification();

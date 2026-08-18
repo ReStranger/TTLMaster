@@ -28,7 +28,7 @@
     <string name="prefs_general_fixInputTtl_summary">Если оператор отправляет TTL=1, то данная опция это исправит</string>
 
     <string name="prefs_general_routeVpnTraffic_title">Заворачивать трафик в VPN</string>
-    <string name="prefs_general_routeVpnTraffic_summary">Помечать трафик режима модема и направлять его через tun0 при активном VPN</string>
+    <string name="prefs_general_routeVpnTraffic_summary">Направлять трафик точки доступа через активный VPN-интерфейс с помощью policy routing</string>
 
     <string name="prefs_boot_title">Автозапуск</string>
 

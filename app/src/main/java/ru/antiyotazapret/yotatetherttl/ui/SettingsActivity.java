@@ -6,6 +6,8 @@ import android.util.TypedValue;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
@@ -22,6 +24,10 @@ public class SettingsActivity extends AppCompatActivity {
         setContentView(R.layout.settings);
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar, (v, insets) -> {
+            v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.systemBars()).top, 0, 0);
+            return insets;
+        });
         toolbar.setTitle(R.string.action_settings);
         toolbar.setClickable(true);
         toolbar.setNavigationIcon(getResIdFromAttribute(this));

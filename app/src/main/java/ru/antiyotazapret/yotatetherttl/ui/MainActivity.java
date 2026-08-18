@@ -17,6 +17,8 @@ import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -57,6 +59,10 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.main);
         toolbar = findViewById(R.id.toolbar);
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar, (v, insets) -> {
+            v.setPadding(0, insets.getInsets(WindowInsetsCompat.Type.systemBars()).top, 0, 0);
+            return insets;
+        });
         currentTtlView = findViewById(R.id.current_ttl_view);
         swipeRefreshLayout = findViewById(R.id.swipe_refresh);
         ttlScopeTextView = findViewById(R.id.current_ttl_scope);
